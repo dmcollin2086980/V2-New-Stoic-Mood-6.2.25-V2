@@ -9,19 +9,19 @@ struct MainView: View {
     
     var body: some View {
         TabView(selection: $selectedTab) {
-            DashboardView(viewModel: viewModel)
+            DashboardView()
                 .tabItem {
                     Label("Dashboard", systemImage: "chart.bar")
                 }
                 .tag(0)
             
-            JournalView(viewModel: viewModel)
+            JournalView()
                 .tabItem {
                     Label("Journal", systemImage: "book")
                 }
                 .tag(1)
             
-            InsightsView(viewModel: viewModel)
+            InsightsView()
                 .tabItem {
                     Label("Insights", systemImage: "lightbulb")
                 }
@@ -56,9 +56,10 @@ struct MainView: View {
         }
         .sheet(isPresented: $showingJournalEntry) {
             if let mood = selectedMood {
-                JournalEntryView(viewModel: viewModel, selectedMood: mood)
+                JournalEntryView(selectedMood: mood)
             }
         }
+        .environmentObject(viewModel)
     }
 }
 

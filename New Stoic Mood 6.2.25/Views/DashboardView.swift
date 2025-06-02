@@ -2,7 +2,7 @@ import SwiftUI
 import Charts
 
 struct DashboardView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     @State private var showingQuote = true
     
     var body: some View {
@@ -22,17 +22,13 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal)
                     
-                    // Mood Flow Chart
-                    MoodFlowChartView(viewModel: viewModel)
-                        .frame(height: 200)
-                        .padding(.horizontal)
-                    
                     // Week Overview
-                    WeekOverviewView(viewModel: viewModel)
+                    WeekOverviewView()
                         .padding(.horizontal)
                     
-                    // Recent Entries
-                    RecentEntriesView(viewModel: viewModel)
+                    // Mood Flow Chart
+                    MoodFlowChartView()
+                        .frame(height: 200)
                         .padding(.horizontal)
                 }
                 .padding(.vertical)
@@ -107,7 +103,7 @@ struct QuoteView: View {
 }
 
 struct MoodFlowChartView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     
     private struct MoodDataPoint: Identifiable {
         let id = UUID()
@@ -156,7 +152,7 @@ struct MoodFlowChartView: View {
 }
 
 struct WeekOverviewView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -196,7 +192,7 @@ struct WeekOverviewView: View {
 }
 
 struct RecentEntriesView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -251,6 +247,7 @@ struct EntryRow: View {
 
 struct DashboardView_Previews: PreviewProvider {
     static var previews: some View {
-        DashboardView(viewModel: MoodViewModel())
+        DashboardView()
+            .environmentObject(MoodViewModel())
     }
 } 

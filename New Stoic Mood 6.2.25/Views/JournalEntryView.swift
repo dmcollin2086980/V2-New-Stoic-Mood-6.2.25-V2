@@ -2,7 +2,7 @@ import SwiftUI
 
 struct JournalEntryView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     let selectedMood: MoodType
     
     @State private var content: String = ""
@@ -108,9 +108,7 @@ struct JournalEntryView: View {
 
 struct JournalEntryView_Previews: PreviewProvider {
     static var previews: some View {
-        JournalEntryView(
-            viewModel: MoodViewModel(),
-            selectedMood: .content
-        )
+        JournalEntryView(selectedMood: .content)
+            .environmentObject(MoodViewModel())
     }
 } 

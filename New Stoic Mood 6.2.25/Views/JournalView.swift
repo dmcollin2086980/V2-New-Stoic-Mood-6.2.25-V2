@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct JournalView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     @State private var showingExportOptions = false
     
     var body: some View {
@@ -218,6 +218,7 @@ struct ExportOptionRow: View {
 
 struct JournalView_Previews: PreviewProvider {
     static var previews: some View {
-        JournalView(viewModel: MoodViewModel())
+        JournalView()
+            .environmentObject(MoodViewModel())
     }
 } 

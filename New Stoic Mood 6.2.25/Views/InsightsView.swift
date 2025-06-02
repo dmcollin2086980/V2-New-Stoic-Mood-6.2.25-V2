@@ -2,45 +2,94 @@ import SwiftUI
 import Charts
 
 struct InsightsView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
+    @State private var showingExportOptions = false
+    @State private var exportFormat: ExportFormat = .csv
+    @State private var showingShareSheet = false
+    @State private var exportData: String = ""
+    
+    enum ExportFormat {
+        case csv, pdf
+        
+        var displayName: String {
+            switch self {
+            case .csv: return "CSV"
+            case .pdf: return "PDF"
+            }
+        }
+    }
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Time of Day Patterns
-                    TimePatternsView(viewModel: viewModel)
-                        .padding(.horizontal)
-                    
-                    // Mood Transitions
-                    MoodTransitionsView(viewModel: viewModel)
-                        .padding(.horizontal)
-                    
-                    // Journal Analysis
-                    JournalAnalysisView(viewModel: viewModel)
-                        .padding(.horizontal)
-                    
-                    // Emotional Patterns
-                    EmotionalPatternsView(viewModel: viewModel)
-                        .padding(.horizontal)
-                    
-                    // Growth Insights
-                    GrowthInsightsView(viewModel: viewModel)
-                        .padding(.horizontal)
-                    
-                    // Reflection Quality
-                    ReflectionQualityView(viewModel: viewModel)
-                        .padding(.horizontal)
+            List {
+                Section(header: Text("Statistics")) {
+                    StatRow(title: "Current Streak", value: "\(viewModel.currentStreak) days")
+                    StatRow(title: "Total Entries", value: "\(viewModel.totalEntries)")
                 }
-                .padding(.vertical)
+                
+                Section(header: Text("Export Data")) {
+                    Button(action: { showingExportOptions = true }) {
+                        Label("Export Journal", systemImage: "square.and.arrow.up")
+                    }
+                }
             }
             .navigationTitle("Insights")
+            .actionSheet(isPresented: $showingExportOptions) {
+                ActionSheet(
+                    title: Text("Export Format"),
+                    message: Text("Choose a format to export your journal"),
+                    buttons: [
+                        .default(Text("PDF")) { exportFormat = .pdf; prepareExport() },
+                        .default(Text("CSV")) { exportFormat = .csv; prepareExport() },
+                        .cancel()
+                    ]
+                )
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                if let data = exportData.data(using: .utf8) {
+                    ShareSheet(items: [data])
+                }
+            }
+        }
+    }
+    
+    private func prepareExport() {
+        switch exportFormat {
+        case .csv:
+            exportData = viewModel.exportAsCSV()
+        case .pdf:
+            exportData = viewModel.exportAsPDF()
+        }
+        showingShareSheet = true
+    }
+}
+
+struct StatRow: View {
+    let title: String
+    let value: String
+    
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Text(value)
+                .foregroundColor(.secondary)
         }
     }
 }
 
+struct ShareSheet: UIViewControllerRepresentable {
+    let items: [Any]
+    
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+    
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
 struct TimePatternsView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -73,7 +122,7 @@ struct TimePatternsView: View {
 }
 
 struct MoodTransitionsView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -108,7 +157,7 @@ struct MoodTransitionsView: View {
 }
 
 struct JournalAnalysisView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -157,7 +206,7 @@ struct JournalAnalysisView: View {
 }
 
 struct EmotionalPatternsView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -193,7 +242,7 @@ struct EmotionalPatternsView: View {
 }
 
 struct GrowthInsightsView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -236,7 +285,7 @@ struct GrowthInsightsView: View {
 }
 
 struct ReflectionQualityView: View {
-    @ObservedObject var viewModel: MoodViewModel
+    @EnvironmentObject var viewModel: MoodViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -277,6 +326,7 @@ struct ReflectionQualityView: View {
 
 struct InsightsView_Previews: PreviewProvider {
     static var previews: some View {
-        InsightsView(viewModel: MoodViewModel())
+        InsightsView()
+            .environmentObject(MoodViewModel())
     }
 } 

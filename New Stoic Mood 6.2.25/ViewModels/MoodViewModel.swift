@@ -28,6 +28,13 @@ class MoodViewModel: ObservableObject {
         updateStats()
     }
     
+    func updateEntry(_ entry: MoodEntry) {
+        if let index = entries.firstIndex(where: { $0.id == entry.id }) {
+            entries[index] = entry
+            saveEntries()
+        }
+    }
+    
     private func saveEntries() {
         if let encoded = try? JSONEncoder().encode(entries) {
             userDefaults.set(encoded, forKey: entriesKey)
@@ -106,6 +113,54 @@ class MoodViewModel: ObservableObject {
         
         let total = dayEntries.reduce(0) { $0 + $1.mood.value }
         return Double(total) / Double(dayEntries.count)
+    }
+    
+    func exportAsCSV() -> String {
+        var csv = "Date,Time,Mood,Entry,Word Count\n"
+        entries.forEach { entry in
+            let date = entry.timestamp.formatted(date: .numeric, time: .omitted)
+            let time = entry.timestamp.formatted(date: .omitted, time: .shortened)
+            let content = entry.content.replacingOccurrences(of: "\"", with: "\"\"")
+            csv += "\"\(date)\",\"\(time)\",\"\(entry.mood.displayName)\",\"\(content)\",\(entry.wordCount)\n"
+        }
+        return csv
+    }
+    
+    func exportAsPDF() -> String {
+        var html = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Mood Journal</title>
+            <style>
+                body { font-family: -apple-system, system-ui, sans-serif; margin: 40px; color: #333; }
+                h1 { color: #1a1a1a; margin-bottom: 30px; }
+                .entry { margin-bottom: 30px; page-break-inside: avoid; }
+                .date { font-weight: bold; color: #666; }
+                .mood { display: inline-block; margin-left: 10px; }
+                .content { margin-top: 10px; line-height: 1.6; }
+                .wordcount { font-size: 12px; color: #999; margin-top: 5px; }
+            </style>
+        </head>
+        <body>
+            <h1>Mood Journal</h1>
+            <p>Generated on \(Date().formatted(date: .long, time: .shortened))</p>
+            <hr>
+        """
+        
+        entries.forEach { entry in
+            html += """
+                <div class="entry">
+                    <div class="date">\(entry.timestamp.formatted(date: .long, time: .shortened))</div>
+                    <div class="mood">Mood: \(entry.mood.displayName) \(entry.mood.emoji)</div>
+                    <div class="content">\(entry.content)</div>
+                    <div class="wordcount">Words: \(entry.wordCount)</div>
+                </div>
+            """
+        }
+        
+        html += "</body></html>"
+        return html
     }
 }
 
