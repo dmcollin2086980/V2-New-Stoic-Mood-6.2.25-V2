@@ -3,330 +3,127 @@ import Charts
 
 struct InsightsView: View {
     @EnvironmentObject var viewModel: MoodViewModel
-    @State private var showingExportOptions = false
-    @State private var exportFormat: ExportFormat = .csv
-    @State private var showingShareSheet = false
-    @State private var exportData: String = ""
+    @State private var selectedTimeRange: TimeRange = .week
     
-    enum ExportFormat {
-        case csv, pdf
+    private var moodDistribution: [(mood: String, count: Int)] {
+        let moodCounts = Dictionary(grouping: viewModel.entries, by: { $0.mood.rawValue })
+            .mapValues { $0.count }
         
-        var displayName: String {
-            switch self {
-            case .csv: return "CSV"
-            case .pdf: return "PDF"
+        return moodCounts.map { mood, count in
+            (mood: mood, count: count)
+        }.sorted { $0.count > $1.count }
+    }
+    
+    private var timePatternData: [[Int]] {
+        // Initialize 8x7 grid (8 time blocks, 7 days) with zeros
+        var grid: [[Int]] = Array(repeating: Array(repeating: 0, count: 7), count: 8)
+        
+        // Fill in the grid based on entries
+        for entry in viewModel.entries {
+            let calendar = Calendar.current
+            
+            // Safely extract date components
+            let dateComponents = calendar.dateComponents([.hour, .weekday], from: entry.timestamp)
+            
+            guard let hour = dateComponents.hour,
+                  let weekday = dateComponents.weekday else {
+                continue
             }
+            
+            // Ensure weekday is in valid range (1-7) before converting to 0-6
+            guard weekday >= 1 && weekday <= 7 else { continue }
+            let weekdayIndex = weekday - 1
+            
+            // Map hour to 0-7 range (3-hour blocks)
+            // Ensure hour is valid (0-23) and calculate block index
+            guard hour >= 0 && hour <= 23 else { continue }
+            let hourIndex = min(hour / 3, 7)
+            
+            // Double-check bounds before incrementing
+            guard hourIndex >= 0 && hourIndex < grid.count,
+                  weekdayIndex >= 0 && weekdayIndex < grid[hourIndex].count else {
+                continue
+            }
+            
+            grid[hourIndex][weekdayIndex] += 1
         }
+        
+        return grid
     }
     
     var body: some View {
         NavigationView {
-            List {
-                Section(header: Text("Statistics")) {
-                    StatRow(title: "Current Streak", value: "\(viewModel.currentStreak) days")
-                    StatRow(title: "Total Entries", value: "\(viewModel.totalEntries)")
-                }
-                
-                Section(header: Text("Export Data")) {
-                    Button(action: { showingExportOptions = true }) {
-                        Label("Export Journal", systemImage: "square.and.arrow.up")
+            ScrollView {
+                VStack(spacing: 20) {
+                    // Time Range Picker
+                    Picker("Time Range", selection: $selectedTimeRange) {
+                        ForEach(TimeRange.allCases) { range in
+                            Text(range.displayName)
+                                .tag(range)
+                        }
                     }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal)
+                    
+                    // Mood Flow Chart
+                    VStack(alignment: .leading, spacing: 15) {
+                        Text("Mood Flow")
+                            .font(.headline)
+                            .foregroundColor(Theme.current.primaryTextColor)
+                        
+                        MoodFlowChartView()
+                            .frame(height: 200)
+                    }
+                    .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Theme.current.secondaryBackgroundColor)
+                    .cornerRadius(12)
+                    .padding(.horizontal)
+                    
+                    // Mood Distribution
+                    InsightCard(title: "Mood Distribution") {
+                        MoodDistributionChart(data: moodDistribution)
+                    }
+                    .padding(.horizontal)
+                    
+                    // Time of Day Patterns
+                    InsightCard(title: "Time of Day Patterns") {
+                        TimeOfDayHeatmap(data: timePatternData)
+                    }
+                    .padding(.horizontal)
+                    
+                    // Word Cloud
+                    InsightCard(title: "Common Themes") {
+                        WordCloudView(words: viewModel.journalAnalysis?.topWords ?? [])
+                    }
+                    .padding(.horizontal)
+                    
+                    // Emotional Patterns
+                    InsightCard(title: "Emotional Patterns") {
+                        EmotionalPatternsView()
+                    }
+                    .padding(.horizontal)
+                    
+                    // Growth Insights
+                    InsightCard(title: "Growth Insights") {
+                        GrowthInsightsView()
+                    }
+                    .padding(.horizontal)
+                    
+                    // Reflection Quality
+                    InsightCard(title: "Reflection Quality") {
+                        ReflectionQualityView()
+                    }
+                    .padding(.horizontal)
                 }
+                .padding(.vertical)
             }
             .navigationTitle("Insights")
-            .actionSheet(isPresented: $showingExportOptions) {
-                ActionSheet(
-                    title: Text("Export Format"),
-                    message: Text("Choose a format to export your journal"),
-                    buttons: [
-                        .default(Text("PDF")) { exportFormat = .pdf; prepareExport() },
-                        .default(Text("CSV")) { exportFormat = .csv; prepareExport() },
-                        .cancel()
-                    ]
-                )
-            }
-            .sheet(isPresented: $showingShareSheet) {
-                if let data = exportData.data(using: .utf8) {
-                    ShareSheet(items: [data])
-                }
-            }
-        }
-    }
-    
-    private func prepareExport() {
-        switch exportFormat {
-        case .csv:
-            exportData = viewModel.exportAsCSV()
-        case .pdf:
-            exportData = viewModel.exportAsPDF()
-        }
-        showingShareSheet = true
-    }
-}
-
-struct StatRow: View {
-    let title: String
-    let value: String
-    
-    var body: some View {
-        HStack {
-            Text(title)
-            Spacer()
-            Text(value)
-                .foregroundColor(.secondary)
         }
     }
 }
 
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
-    
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
-    }
-    
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+#Preview {
+    InsightsView()
+        .environmentObject(MoodViewModel())
 }
-
-struct TimePatternsView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Mood Patterns by Time of Day")
-                .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
-            
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 5) {
-                ForEach(0..<24) { hour in
-                    let entries = viewModel.entries.filter {
-                        Calendar.current.component(.hour, from: $0.timestamp) == hour
-                    }
-                    
-                    VStack {
-                        Text(String(format: "%02d:00", hour))
-                            .font(.caption2)
-                            .foregroundColor(Theme.dark.tertiaryTextColor)
-                        
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(entries.isEmpty ? Theme.dark.tertiaryBackgroundColor : Theme.dark.accentColor)
-                            .frame(height: 30)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
-        .cornerRadius(12)
-    }
-}
-
-struct MoodTransitionsView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Mood Transitions")
-                .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
-            
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: MoodType.allCases.count), spacing: 2) {
-                ForEach(MoodType.allCases, id: \.self) { fromMood in
-                    ForEach(MoodType.allCases, id: \.self) { toMood in
-                        let transitions = viewModel.entries.enumerated().filter { index, entry in
-                            guard index < viewModel.entries.count - 1 else { return false }
-                            return entry.mood == fromMood && viewModel.entries[index + 1].mood == toMood
-                        }
-                        
-                        RoundedRectangle(cornerRadius: 4)
-                            .fill(transitions.isEmpty ? Theme.dark.tertiaryBackgroundColor : Theme.dark.accentColor)
-                            .frame(height: 30)
-                            .overlay(
-                                Text("\(transitions.count)")
-                                    .font(.caption2)
-                                    .foregroundColor(Theme.dark.primaryTextColor)
-                            )
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
-        .cornerRadius(12)
-    }
-}
-
-struct JournalAnalysisView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Journal Analysis")
-                .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
-            
-            if viewModel.entries.isEmpty {
-                Text("Start journaling to see your analysis")
-                    .foregroundColor(Theme.dark.secondaryTextColor)
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Average entry length: \(averageWordCount) words")
-                    Text("Most common mood: \(mostCommonMood)")
-                    Text("Best writing time: \(bestWritingTime)")
-                }
-                .foregroundColor(Theme.dark.primaryTextColor)
-            }
-        }
-        .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
-        .cornerRadius(12)
-    }
-    
-    private var averageWordCount: Int {
-        let total = viewModel.entries.reduce(0) { $0 + $1.wordCount }
-        return total / max(1, viewModel.entries.count)
-    }
-    
-    private var mostCommonMood: String {
-        let moodCounts = Dictionary(grouping: viewModel.entries, by: { $0.mood })
-            .mapValues { $0.count }
-        return moodCounts.max(by: { $0.value < $1.value })?.key.displayName ?? "N/A"
-    }
-    
-    private var bestWritingTime: String {
-        let hourCounts = Dictionary(grouping: viewModel.entries) {
-            Calendar.current.component(.hour, from: $0.timestamp)
-        }.mapValues { $0.count }
-        
-        if let bestHour = hourCounts.max(by: { $0.value < $1.value })?.key {
-            return String(format: "%02d:00", bestHour)
-        }
-        return "N/A"
-    }
-}
-
-struct EmotionalPatternsView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Your Emotional Patterns")
-                .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
-            
-            if viewModel.entries.isEmpty {
-                Text("Start tracking your moods to discover patterns")
-                    .foregroundColor(Theme.dark.secondaryTextColor)
-            } else {
-                VStack(spacing: 8) {
-                    ForEach(MoodType.allCases, id: \.self) { mood in
-                        let count = viewModel.entries.filter { $0.mood == mood }.count
-                        let percentage = Double(count) / Double(viewModel.entries.count) * 100
-                        
-                        HStack {
-                            Text(mood.emoji)
-                            Text(mood.displayName)
-                            Spacer()
-                            Text("\(Int(percentage))%")
-                                .foregroundColor(Theme.dark.secondaryTextColor)
-                        }
-                        .foregroundColor(Theme.dark.primaryTextColor)
-                    }
-                }
-            }
-        }
-        .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
-        .cornerRadius(12)
-    }
-}
-
-struct GrowthInsightsView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Growth Opportunities")
-                .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
-            
-            if viewModel.entries.count < 5 {
-                Text("Add more entries to see growth insights")
-                    .foregroundColor(Theme.dark.secondaryTextColor)
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Your reflection depth is \(reflectionTrend).")
-                    Text("Average \(averageWordsPerDay) words per day this week.")
-                    Text("Consider exploring deeper themes in your reflections.")
-                }
-                .foregroundColor(Theme.dark.primaryTextColor)
-            }
-        }
-        .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
-        .cornerRadius(12)
-    }
-    
-    private var reflectionTrend: String {
-        let recentEntries = viewModel.entries.prefix(7)
-        let olderEntries = viewModel.entries.dropFirst(7).prefix(7)
-        
-        let recentAvg = recentEntries.reduce(0) { $0 + $1.wordCount } / max(1, recentEntries.count)
-        let olderAvg = olderEntries.reduce(0) { $0 + $1.wordCount } / max(1, olderEntries.count)
-        
-        return recentAvg > olderAvg ? "increasing" : "steady"
-    }
-    
-    private var averageWordsPerDay: Int {
-        let weekEntries = viewModel.entries.prefix(7)
-        let totalWords = weekEntries.reduce(0) { $0 + $1.wordCount }
-        return totalWords / max(1, weekEntries.count)
-    }
-}
-
-struct ReflectionQualityView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Reflection Quality")
-                .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
-            
-            if viewModel.entries.isEmpty {
-                Text("Start journaling to track your reflection quality")
-                    .foregroundColor(Theme.dark.secondaryTextColor)
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Average reflection length: \(averageWordCount) words")
-                    Text("Current consistency streak: \(viewModel.currentStreak) days")
-                    Text(qualityFeedback)
-                }
-                .foregroundColor(Theme.dark.primaryTextColor)
-            }
-        }
-        .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
-        .cornerRadius(12)
-    }
-    
-    private var averageWordCount: Int {
-        let total = viewModel.entries.reduce(0) { $0 + $1.wordCount }
-        return total / max(1, viewModel.entries.count)
-    }
-    
-    private var qualityFeedback: String {
-        if averageWordCount > 50 {
-            return "Your reflections show good depth and thoughtfulness."
-        } else {
-            return "Try writing longer reflections to explore your thoughts more deeply."
-        }
-    }
-}
-
-struct InsightsView_Previews: PreviewProvider {
-    static var previews: some View {
-        InsightsView()
-            .environmentObject(MoodViewModel())
-    }
-} 
