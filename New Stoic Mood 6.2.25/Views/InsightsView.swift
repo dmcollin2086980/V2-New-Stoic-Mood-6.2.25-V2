@@ -2,128 +2,192 @@ import SwiftUI
 import Charts
 
 struct InsightsView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
-    @State private var selectedTimeRange: TimeRange = .week
+    @StateObject private var viewModel = MoodViewModel()
+    @EnvironmentObject private var themeManager: ThemeManager
+    @State private var selectedSection: InsightSection = .patterns
     
-    private var moodDistribution: [(mood: String, count: Int)] {
-        let moodCounts = Dictionary(grouping: viewModel.entries, by: { $0.mood.rawValue })
-            .mapValues { $0.count }
-        
-        return moodCounts.map { mood, count in
-            (mood: mood, count: count)
-        }.sorted { $0.count > $1.count }
-    }
-    
-    private var timePatternData: [[Int]] {
-        // Initialize 8x7 grid (8 time blocks, 7 days) with zeros
-        var grid: [[Int]] = Array(repeating: Array(repeating: 0, count: 7), count: 8)
-        
-        // Fill in the grid based on entries
-        for entry in viewModel.entries {
-            let calendar = Calendar.current
-            
-            // Safely extract date components
-            let dateComponents = calendar.dateComponents([.hour, .weekday], from: entry.timestamp)
-            
-            guard let hour = dateComponents.hour,
-                  let weekday = dateComponents.weekday else {
-                continue
-            }
-            
-            // Ensure weekday is in valid range (1-7) before converting to 0-6
-            guard weekday >= 1 && weekday <= 7 else { continue }
-            let weekdayIndex = weekday - 1
-            
-            // Map hour to 0-7 range (3-hour blocks)
-            // Ensure hour is valid (0-23) and calculate block index
-            guard hour >= 0 && hour <= 23 else { continue }
-            let hourIndex = min(hour / 3, 7)
-            
-            // Double-check bounds before incrementing
-            guard hourIndex >= 0 && hourIndex < grid.count,
-                  weekdayIndex >= 0 && weekdayIndex < grid[hourIndex].count else {
-                continue
-            }
-            
-            grid[hourIndex][weekdayIndex] += 1
-        }
-        
-        return grid
+    enum InsightSection: String, CaseIterable {
+        case patterns = "Patterns"
+        case analysis = "Analysis"
+        case growth = "Growth"
     }
     
     var body: some View {
         NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Time Range Picker
-                    Picker("Time Range", selection: $selectedTimeRange) {
-                        ForEach(TimeRange.allCases) { range in
-                            Text(range.displayName)
-                                .tag(range)
+            VStack(spacing: 0) {
+                // Section Picker
+                Picker("Section", selection: $selectedSection) {
+                    ForEach(InsightSection.allCases, id: \.self) { section in
+                        Text(section.rawValue).tag(section)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding()
+                
+                // Content
+                ScrollView {
+                    VStack(spacing: ThemeManager.padding) {
+                        switch selectedSection {
+                        case .patterns:
+                            patternsSection
+                        case .analysis:
+                            analysisSection
+                        case .growth:
+                            growthSection
                         }
                     }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    
-                    // Mood Flow Chart
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text("Mood Flow")
-                            .font(.headline)
-                            .foregroundColor(Theme.current.primaryTextColor)
-                        
-                        MoodFlowChartView()
-                            .frame(height: 200)
-                    }
                     .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Theme.current.secondaryBackgroundColor)
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                    
-                    // Mood Distribution
-                    InsightCard(title: "Mood Distribution") {
-                        MoodDistributionChart(data: moodDistribution)
-                    }
-                    .padding(.horizontal)
-                    
-                    // Time of Day Patterns
-                    InsightCard(title: "Time of Day Patterns") {
-                        TimeOfDayHeatmap(data: timePatternData)
-                    }
-                    .padding(.horizontal)
-                    
-                    // Word Cloud
-                    InsightCard(title: "Common Themes") {
-                        WordCloudView(words: viewModel.journalAnalysis?.topWords ?? [])
-                    }
-                    .padding(.horizontal)
-                    
-                    // Emotional Patterns
-                    InsightCard(title: "Emotional Patterns") {
-                        EmotionalPatternsView()
-                    }
-                    .padding(.horizontal)
-                    
-                    // Growth Insights
-                    InsightCard(title: "Growth Insights") {
-                        GrowthInsightsView()
-                    }
-                    .padding(.horizontal)
-                    
-                    // Reflection Quality
-                    InsightCard(title: "Reflection Quality") {
-                        ReflectionQualityView()
-                    }
-                    .padding(.horizontal)
                 }
-                .padding(.vertical)
             }
             .navigationTitle("Insights")
+            .themeBackground()
+        }
+    }
+    
+    // MARK: - Section Views
+    
+    private var patternsSection: some View {
+        VStack(spacing: ThemeManager.padding) {
+            // Mood Transitions
+            if let transitions = viewModel.moodTransitions, !transitions.isEmpty {
+                InsightCard(title: "Mood Patterns") {
+                    VStack(alignment: .leading, spacing: ThemeManager.smallPadding) {
+                        ForEach(transitions.prefix(3), id: \.id) { transition in
+                            HStack {
+                                Text("\(transition.from.emoji) → \(transition.to.emoji)")
+                                    .font(.title2)
+                                
+                                Spacer()
+                                
+                                Text("\(transition.count) times")
+                                    .foregroundColor(themeManager.secondaryTextColor)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Time Patterns
+            if !viewModel.timePatterns.isEmpty {
+                InsightCard(title: "Journaling Habits") {
+                    VStack(alignment: .leading, spacing: ThemeManager.smallPadding) {
+                        ForEach(viewModel.timePatterns, id: \.title) { pattern in
+                            HStack {
+                                Image(systemName: pattern.icon)
+                                    .foregroundColor(themeManager.accentColor)
+                                
+                                VStack(alignment: .leading) {
+                                    Text(pattern.title)
+                                        .font(.headline)
+                                    
+                                    Text(pattern.description)
+                                        .font(.subheadline)
+                                        .foregroundColor(themeManager.secondaryTextColor)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private var analysisSection: some View {
+        VStack(spacing: ThemeManager.padding) {
+            // Text Analysis
+            if let analysis = viewModel.textAnalysis {
+                InsightCard(title: "Writing Analysis") {
+                    VStack(alignment: .leading, spacing: ThemeManager.smallPadding) {
+                        Text("Average Length: \(analysis.averageLength) words")
+                            .themeText()
+                        
+                        Text("Writing Style: \(analysis.writingStyle)")
+                            .themeText()
+                        
+                        Text("Sentiment: \(formatSentiment(analysis.sentiment))")
+                            .themeText()
+                        
+                        if !analysis.themes.isEmpty {
+                            Text("Common Themes:")
+                                .themeText()
+                                .padding(.top, 4)
+                            
+                            FlowLayout(spacing: 8) {
+                                ForEach(analysis.themes, id: \.self) { theme in
+                                    Text(theme)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(themeManager.accentColor.opacity(0.2))
+                                        .foregroundColor(themeManager.accentColor)
+                                        .cornerRadius(ThemeManager.cornerRadius)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Reflection Quality
+            if let quality = viewModel.reflectionQuality {
+                InsightCard(title: "Reflection Quality") {
+                    VStack(alignment: .leading, spacing: ThemeManager.smallPadding) {
+                        HStack {
+                            Text("Average Length")
+                            Spacer()
+                            Text("\(quality.length) words")
+                                .foregroundColor(themeManager.secondaryTextColor)
+                        }
+                        
+                        HStack {
+                            Text("Consistency")
+                            Spacer()
+                            Text("\(quality.consistency)%")
+                                .foregroundColor(themeManager.secondaryTextColor)
+                        }
+                        
+                        Text(quality.feedback ?? "Keep up the good work with your reflections!")
+                            .themeText()
+                            .padding(.top, 4)
+                    }
+                }
+            }
+        }
+    }
+    
+    private var growthSection: some View {
+        VStack(spacing: ThemeManager.padding) {
+            // Growth Insights
+            if let insights = viewModel.growthInsights, !insights.isEmpty {
+                InsightCard(title: "Growth Opportunities") {
+                    VStack(alignment: .leading, spacing: ThemeManager.smallPadding) {
+                        ForEach(insights, id: \.self) { insight in
+                            HStack(alignment: .top) {
+                                Image(systemName: "lightbulb.fill")
+                                    .foregroundColor(themeManager.accentColor)
+                                
+                                Text(insight)
+                                    .themeText()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func formatSentiment(_ value: Double) -> String {
+        switch value {
+        case ..<(-0.3):
+            return "Negative"
+        case (-0.3)..<0.3:
+            return "Neutral"
+        default:
+            return "Positive"
         }
     }
 }
 
 #Preview {
     InsightsView()
-        .environmentObject(MoodViewModel())
+        .environmentObject(ThemeManager())
 }

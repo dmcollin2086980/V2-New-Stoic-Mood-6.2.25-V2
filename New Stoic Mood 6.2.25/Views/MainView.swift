@@ -1,70 +1,78 @@
 import SwiftUI
 
 struct MainView: View {
-    @StateObject private var viewModel = MoodViewModel()
-    @State private var selectedTab = 0
+    @EnvironmentObject var viewModel: MoodViewModel
+    @EnvironmentObject var themeManager: ThemeManager
     @State private var showingMoodSelection = false
-    @State private var showingJournalEntry = false
-    @State private var selectedMood: MoodType?
+    @State private var showingJournal = false
+    @State private var selectedMood: Mood?
+    @State private var selectedIntensity: Int = 5
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            DashboardView()
-                .tabItem {
-                    Label("Dashboard", systemImage: "chart.bar")
-                }
-                .tag(0)
-            
-            JournalView()
-                .tabItem {
-                    Label("Journal", systemImage: "book")
-                }
-                .tag(1)
-            
-            InsightsView()
-                .tabItem {
-                    Label("Insights", systemImage: "lightbulb")
-                }
-                .tag(2)
-        }
-        .overlay(
-            VStack {
+        NavigationStack {
+            VStack(spacing: ThemeManager.padding) {
+                StoicQuoteView()
+                    .padding(.top)
+                
                 Spacer()
-                HStack {
-                    Spacer()
-                    Button(action: {
-                        showingMoodSelection = true
-                    }) {
-                        Image(systemName: "plus")
-                            .font(.title2)
-                            .foregroundColor(.white)
-                            .frame(width: 56, height: 56)
-                            .background(Theme.dark.accentColor)
-                            .clipShape(Circle())
-                            .shadow(radius: 4)
-                    }
-                    .padding()
+                
+                Button(action: {
+                    showingMoodSelection = true
+                }) {
+                    Text("How are you feeling?")
+                        .font(.title2)
+                        .foregroundColor(themeManager.textColor)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(themeManager.backgroundColor)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(themeManager.accentColor, lineWidth: 1)
+                        )
+                }
+                .padding(.horizontal)
+                
+                Button(action: {
+                    showingJournal = true
+                }) {
+                    Text("View Journal")
+                        .font(.title2)
+                        .foregroundColor(themeManager.textColor)
+                        .padding()
+                        .frame(maxWidth: .infinity)
+                        .background(themeManager.backgroundColor)
+                        .cornerRadius(10)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(themeManager.accentColor, lineWidth: 1)
+                        )
+                }
+                .padding(.horizontal)
+                
+                Spacer()
+            }
+            .background(themeManager.backgroundColor)
+            .navigationTitle("Stoic Mood")
+            .navigationBarItems(trailing: NavigationLink(destination: SettingsView()) {
+                Image(systemName: "gear")
+                    .foregroundColor(themeManager.textColor)
+            })
+            .sheet(isPresented: $showingMoodSelection) {
+                EnhancedMoodSelectionView { _, intensity in
+                    selectedIntensity = Int(intensity)
+                    showingJournal = true
                 }
             }
-        )
-        .sheet(isPresented: $showingMoodSelection) {
-            MoodSelectionView(
-                selectedMood: $selectedMood,
-                showingMoodSelection: $showingMoodSelection,
-                showingJournalEntry: $showingJournalEntry
-            )
-        }
-        .sheet(isPresented: $showingJournalEntry) {
-            if let mood = selectedMood {
-                JournalEntryView(selectedMood: mood)
+            .sheet(isPresented: $showingJournal) {
+                JournalView()
             }
         }
-        .environmentObject(viewModel)
     }
 }
 
-struct MainView_Previews: PreviewProvider {
-    static var previews: some View {
-        MainView()
-    }
+#Preview {
+    MainView()
+        .environmentObject(MoodViewModel())
+        .environmentObject(ThemeManager())
 } 

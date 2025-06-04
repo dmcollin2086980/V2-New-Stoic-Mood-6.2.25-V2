@@ -3,45 +3,44 @@ import Charts
 
 struct DashboardView: View {
     @EnvironmentObject var viewModel: MoodViewModel
-    @State private var showingQuote = true
+    @EnvironmentObject private var themeManager: ThemeManager
     
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Quote Section
-                    if showingQuote {
-                        QuoteView()
-                            .transition(.move(edge: .top))
-                    }
+        ScrollView {
+            VStack(spacing: 20) {
+                // Stats Row
+                HStack(spacing: 15) {
+                    StatCard(
+                        title: "Current Streak",
+                        value: "\(viewModel.currentStreak)",
+                        subtitle: "days of reflection",
+                        themeManager: themeManager
+                    )
                     
-                    // Stats Section
-                    HStack(spacing: 15) {
-                        StatCard(title: "Current Streak", value: "\(viewModel.currentStreak)", subtitle: "days of reflection")
-                        StatCard(title: "Total Entries", value: "\(viewModel.totalEntries)", subtitle: "moments captured")
-                    }
+                    StatCard(
+                        title: "Total Entries",
+                        value: "\(viewModel.entries.count)",
+                        subtitle: "moments captured",
+                        themeManager: themeManager
+                    )
+                }
+                .padding(.horizontal)
+                
+                // Daily Quote
+                QuoteView(themeManager: themeManager)
                     .padding(.horizontal)
-                    
-                    // Week Overview
-                    WeekOverviewView()
-                        .padding(.horizontal)
-                    
-                    // Mood Flow Chart
-                    MoodFlowChartView()
-                        .frame(height: 200)
-                        .padding(.horizontal)
-                }
-                .padding(.vertical)
+                
+                // Mood Flow Chart
+                DashboardMoodFlowChartView(data: viewModel.moodFlowData)
+                    .padding(.horizontal)
+                
+                // Week Overview
+                WeekOverviewView(entries: viewModel.entries, themeManager: themeManager)
+                    .padding(.horizontal)
             }
-            .navigationTitle("Dashboard")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showingQuote.toggle() }) {
-                        Image(systemName: showingQuote ? "quote.bubble.fill" : "quote.bubble")
-                    }
-                }
-            }
+            .padding(.vertical)
         }
+        .navigationTitle("Dashboard")
     }
 }
 
@@ -49,135 +48,110 @@ struct StatCard: View {
     let title: String
     let value: String
     let subtitle: String
+    let themeManager: ThemeManager
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
+                .foregroundColor(themeManager.secondaryTextColor)
             
             Text(value)
-                .font(.system(size: 32, weight: .light))
-                .foregroundColor(Theme.dark.primaryTextColor)
+                .font(.title)
+                .fontWeight(.bold)
+                .foregroundColor(themeManager.textColor)
             
             Text(subtitle)
-                .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
+                .font(.caption2)
+                .foregroundColor(themeManager.secondaryTextColor)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
+        .background(themeManager.cardBackgroundColor)
         .cornerRadius(12)
     }
 }
 
 struct QuoteView: View {
-    let quotes = [
-        (text: "The happiness of your life depends upon the quality of your thoughts.", author: "Marcus Aurelius"),
-        (text: "It's not what happens to you, but how you react to it that matters.", author: "Epictetus"),
-        (text: "Every new beginning comes from some other beginning's end.", author: "Seneca")
-    ]
-    
-    @State private var currentQuote = 0
+    let themeManager: ThemeManager
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text("\"\(quotes[currentQuote].text)\"")
-                .font(.system(.body, design: .serif))
-                .italic()
-                .foregroundColor(Theme.dark.primaryTextColor)
+        VStack(spacing: 12) {
+            Text("Daily Stoic Wisdom")
+                .font(.headline)
+                .foregroundColor(themeManager.textColor)
             
-            Text("— \(quotes[currentQuote].author)")
-                .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
-                .frame(maxWidth: .infinity, alignment: .trailing)
+            Text(StoicQuotesManager.shared.getRandomQuote())
+                .font(.system(size: 18, weight: .medium, design: .serif))
+                .multilineTextAlignment(.center)
+                .foregroundColor(themeManager.textColor)
+                .padding()
         }
         .padding()
-        .background(Theme.dark.tertiaryBackgroundColor)
+        .background(themeManager.cardBackgroundColor)
         .cornerRadius(12)
-        .padding(.horizontal)
-        .onAppear {
-            currentQuote = Int.random(in: 0..<quotes.count)
-        }
     }
 }
 
-struct MoodFlowChartView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
-    
-    private struct MoodDataPoint: Identifiable {
-        let id = UUID()
-        let date: Date
-        let value: Double
-    }
-    
-    private var moodData: [MoodDataPoint] {
-        (0..<7).compactMap { day in
-            let date = Calendar.current.date(byAdding: .day, value: -6 + day, to: Date())!
-            guard let mood = viewModel.averageMoodForDate(date) else { return nil }
-            return MoodDataPoint(date: date, value: mood)
-        }
-    }
+struct DashboardMoodFlowChartView: View {
+    let data: [MoodFlowData]
+    @EnvironmentObject private var themeManager: ThemeManager
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Mood Flow - Last 7 Days")
+            Text("Mood Flow")
                 .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
+                .foregroundColor(themeManager.secondaryTextColor)
             
-            Chart(moodData) { point in
+            Chart(data) { point in
                 LineMark(
-                    x: .value("Day", point.date),
+                    x: .value("Date", point.date),
                     y: .value("Mood", point.value)
                 )
-                .foregroundStyle(Theme.dark.accentColor)
+                .foregroundStyle(themeManager.accentColor)
                 
                 PointMark(
-                    x: .value("Day", point.date),
+                    x: .value("Date", point.date),
                     y: .value("Mood", point.value)
                 )
-                .foregroundStyle(Theme.dark.accentColor)
+                .foregroundStyle(themeManager.accentColor)
             }
-            .chartYScale(domain: 1...5)
-            .chartXAxis {
-                AxisMarks(values: .stride(by: .day)) { value in
-                    AxisValueLabel(format: .dateTime.weekday(.abbreviated))
-                }
-            }
+            .frame(height: 200)
+            .chartYScale(domain: 0...10)
         }
         .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
+        .background(themeManager.cardBackgroundColor)
         .cornerRadius(12)
     }
 }
 
 struct WeekOverviewView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
+    let entries: [JournalEntry]
+    let themeManager: ThemeManager
     
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("This Week's Journey")
                 .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
+                .foregroundColor(themeManager.secondaryTextColor)
             
             HStack(spacing: 10) {
                 ForEach(0..<7) { day in
                     let date = Calendar.current.date(byAdding: .day, value: -6 + day, to: Date())!
-                    let entries = viewModel.entries.filter {
-                        Calendar.current.isDate($0.timestamp, inSameDayAs: date)
+                    let dayEntries = entries.filter {
+                        Calendar.current.isDate($0.date, inSameDayAs: date)
                     }
                     
                     VStack(spacing: 8) {
                         Text(date.formatted(.dateTime.weekday(.abbreviated)))
                             .font(.caption2)
-                            .foregroundColor(Theme.dark.tertiaryTextColor)
+                            .foregroundColor(themeManager.secondaryTextColor)
                         
-                        if let firstEntry = entries.first {
+                        if let firstEntry = dayEntries.first {
                             Text(firstEntry.mood.emoji)
                                 .font(.title2)
                         } else {
                             Circle()
-                                .fill(Theme.dark.tertiaryBackgroundColor)
+                                .fill(themeManager.cardBackgroundColor)
                                 .frame(width: 40, height: 40)
                         }
                     }
@@ -186,68 +160,13 @@ struct WeekOverviewView: View {
             }
         }
         .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
+        .background(themeManager.cardBackgroundColor)
         .cornerRadius(12)
     }
 }
 
-struct RecentEntriesView: View {
-    @EnvironmentObject var viewModel: MoodViewModel
-    
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Recent Reflections")
-                .font(.caption)
-                .foregroundColor(Theme.dark.secondaryTextColor)
-            
-            if viewModel.entries.isEmpty {
-                VStack(spacing: 10) {
-                    Text("No entries yet")
-                        .foregroundColor(Theme.dark.primaryTextColor)
-                    Text("Start your journey with today's reflection")
-                        .font(.caption)
-                        .foregroundColor(Theme.dark.secondaryTextColor)
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-            } else {
-                ForEach(viewModel.entries.prefix(3)) { entry in
-                    EntryRow(entry: entry)
-                }
-            }
-        }
-        .padding()
-        .background(Theme.dark.secondaryBackgroundColor)
-        .cornerRadius(12)
-    }
-}
-
-struct EntryRow: View {
-    let entry: MoodEntry
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 15) {
-            Text(entry.mood.emoji)
-                .font(.title2)
-            
-            VStack(alignment: .leading, spacing: 5) {
-                Text(entry.timestamp.formatted(.relative(presentation: .named)))
-                    .font(.caption)
-                    .foregroundColor(Theme.dark.tertiaryTextColor)
-                
-                Text(entry.content)
-                    .font(.subheadline)
-                    .foregroundColor(Theme.dark.secondaryTextColor)
-                    .lineLimit(2)
-            }
-        }
-        .padding(.vertical, 5)
-    }
-}
-
-struct DashboardView_Previews: PreviewProvider {
-    static var previews: some View {
-        DashboardView()
-            .environmentObject(MoodViewModel())
-    }
+#Preview {
+    DashboardView()
+        .environmentObject(MoodViewModel())
+        .environmentObject(ThemeManager())
 } 

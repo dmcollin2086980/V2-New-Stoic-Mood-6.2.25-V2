@@ -1,114 +1,94 @@
 import SwiftUI
+import Speech
 
 struct JournalEntryView: View {
+    @StateObject private var viewModel: JournalEntryViewModel
     @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject var viewModel: MoodViewModel
-    let selectedMood: MoodType
+    @EnvironmentObject private var themeManager: ThemeManager
     
-    @State private var content: String = ""
-    @State private var isQuickEntry: Bool = false
-    @State private var showingDiscardAlert: Bool = false
-    
-    private var wordCount: Int {
-        content.split(separator: " ").count
+    init(moodViewModel: MoodViewModel, initialPrompt: String? = nil) {
+        _viewModel = StateObject(wrappedValue: JournalEntryViewModel(moodViewModel: moodViewModel, initialPrompt: initialPrompt))
     }
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 0) {
-                // Mood Header
-                HStack {
-                    Text(selectedMood.emoji)
-                        .font(.system(size: 40))
+            VStack(spacing: Theme.padding) {
+                // Prompt Section
+                VStack(alignment: .leading, spacing: Theme.smallPadding) {
+                    Text("Reflection Prompt")
+                        .font(.headline)
+                        .themeText()
                     
-                    VStack(alignment: .leading) {
-                        Text(selectedMood.displayName)
-                            .font(.title2)
-                            .fontWeight(.medium)
-                        
-                        Text("How are you feeling about this?")
-                            .font(.subheadline)
-                            .foregroundColor(Theme.dark.secondaryTextColor)
-                    }
-                    
-                    Spacer()
+                    Text(viewModel.currentPrompt)
+                        .font(.body)
+                        .themeText()
                 }
                 .padding()
-                .background(Theme.dark.secondaryBackgroundColor)
+                .themeCard()
                 
-                // Journal Entry
-                TextEditor(text: $content)
-                    .font(.body)
+                // Journal Text Editor
+                TextEditor(text: $viewModel.journalText)
+                    .frame(maxHeight: .infinity)
                     .padding()
-                    .background(Theme.dark.backgroundColor)
-                    .scrollContentBackground(.hidden)
+                    .themeCard()
+                    .themeText()
                 
-                // Bottom Bar
-                VStack(spacing: 0) {
-                    Divider()
-                    
-                    HStack {
-                        // Word Count
-                        Text("\(wordCount) words")
-                            .font(.caption)
-                            .foregroundColor(Theme.dark.secondaryTextColor)
-                        
-                        Spacer()
-                        
-                        // Quick Entry Toggle
-                        Toggle("Quick Entry", isOn: $isQuickEntry)
-                            .toggleStyle(SwitchToggleStyle(tint: Theme.dark.accentColor))
-                            .labelsHidden()
+                // Voice Recording Button
+                HStack {
+                    Button(action: {
+                        if viewModel.isRecording {
+                            viewModel.stopRecording()
+                        } else {
+                            viewModel.startRecording()
+                        }
+                    }) {
+                        Image(systemName: viewModel.isRecording ? "stop.circle.fill" : "mic.circle.fill")
+                            .font(.system(size: 44))
+                            .foregroundColor(viewModel.isRecording ? .red : Theme.accentColor)
                     }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    .background(Theme.dark.secondaryBackgroundColor)
+                    
+                    if viewModel.isRecording {
+                        Text("Recording...")
+                            .themeText()
+                    }
                 }
+                .padding()
             }
+            .padding()
+            .themeBackground()
+            .navigationTitle("New Entry")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
-                        if !content.isEmpty {
-                            showingDiscardAlert = true
-                        } else {
-                            dismiss()
-                        }
+                        dismiss()
                     }
+                    .themeText()
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        saveEntry()
+                        // Save entry
+                        dismiss()
                     }
-                    .disabled(content.isEmpty)
+                    .themeText()
                 }
             }
-            .alert("Discard Entry?", isPresented: $showingDiscardAlert) {
-                Button("Discard", role: .destructive) {
-                    dismiss()
+            .alert("Microphone Access Required", isPresented: $viewModel.showingPermissionAlert) {
+                Button("Settings", role: .none) {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
                 }
-                Button("Keep Editing", role: .cancel) {}
+                Button("Cancel", role: .cancel) { }
             } message: {
-                Text("Are you sure you want to discard this entry?")
+                Text("Please enable microphone access in Settings to use voice recording.")
             }
         }
     }
-    
-    private func saveEntry() {
-        let entry = MoodEntry(
-            mood: selectedMood,
-            content: content,
-            isQuickEntry: isQuickEntry
-        )
-        viewModel.addEntry(entry)
-        dismiss()
-    }
 }
 
-struct JournalEntryView_Previews: PreviewProvider {
-    static var previews: some View {
-        JournalEntryView(selectedMood: .content)
-            .environmentObject(MoodViewModel())
-    }
+#Preview {
+    JournalEntryView(moodViewModel: MoodViewModel())
+        .environmentObject(ThemeManager())
 } 

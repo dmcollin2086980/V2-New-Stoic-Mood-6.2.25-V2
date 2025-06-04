@@ -1,0 +1,107 @@
+included:
+  - New Stoic Mood 6.2.25
+
+excluded:
+  - Pods
+  - .build
+  - DerivedData
+
+line_length:
+  warning: 120
+  error: 200
+  ignores_comments: true
+  ignores_urls: true
+
+type_body_length:
+  warning: 300
+  error: 400
+
+file_length:
+  warning: 500
+  error: 1000
+
+function_body_length:
+  warning: 50
+  error: 100
+
+cyclomatic_complexity:
+  warning: 15
+  error: 25
+
+nesting:
+  type_level:
+    warning: 3
+    error: 4
+  statement_level:
+    warning: 5
+    error: 6
+
+reporter: "xcode"
+
+opt_in_rules:
+  - array_constructor
+  - closure_end_indentation
+  - closure_spacing
+  - collection_alignment
+  - contains_over_filter_count
+  - empty_count
+  - empty_string
+  - explicit_init
+  - fallthrough
+  - fatal_error_message
+  - first_where
+  - force_unwrapping
+  - implicit_return
+  - modifier_order
+  - multiline_parameters
+  - operator_usage_whitespace
+  - overridden_super_call
+  - pattern_matching_keywords
+  - prefer_self_type_over_type_of_self
+  - redundant_nil_coalescing
+  - redundant_type_annotation
+  - redundant_void_return
+  - toggle_bool
+  - unowned_variable_capture
+  - vertical_parameter_alignment_on_call
+  - vertical_whitespace_closing_braces
+  - vertical_whitespace_opening_braces
+
+analyzer_rules:
+  - explicit_self
+
+custom_rules:
+  array_constructor:
+    name: "Array/Dictionary Constructor"
+    regex: '[let,var] .+ = \[.+\]\(\)'
+    capture_group: 0
+    message: "Prefer array/dictionary literal syntax over constructor."
+    severity: warning
+
+  vertical_whitespace:
+    name: "Vertical Whitespace"
+    regex: '(\n\s*\n){2,}'
+    capture_group: 0
+    message: "Limit vertical whitespace to a single empty line."
+    severity: warning
+
+  trailing_whitespace:
+    name: "Trailing Whitespace"
+    regex: '[ \t]+$'
+    capture_group: 0
+    message: "Line should not have trailing whitespace."
+    severity: warning
+
+  todo:
+    name: "TODO"
+    regex: '//\s*TODO:'
+    capture_group: 0
+    message: "TODO comments should be resolved before shipping."
+    severity: warning
+
+  fixme:
+    name: "FIXME"
+    regex: '//\s*FIXME:'
+    capture_group: 0
+    message: "FIXME comments should be resolved before shipping."
+    severity: warning 

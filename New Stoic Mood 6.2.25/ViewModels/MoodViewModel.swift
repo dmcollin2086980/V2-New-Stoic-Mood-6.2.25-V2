@@ -2,170 +2,284 @@ import Foundation
 import SwiftUI
 
 class MoodViewModel: ObservableObject {
-    @Published var entries: [MoodEntry] = []
-    @Published var currentFilter: JournalFilter = .all
-    @Published var searchQuery: String = ""
+    @Published var entries: [JournalEntry] = []
+    @Published var textAnalysis: TextAnalysis?
+    @Published var moodTransitions: [MoodTransition]?
+    @Published var timePatterns: [TimePatternData] = []
+    @Published var growthInsights: [String]?
+    @Published var reflectionQuality: ReflectionQuality?
     @Published var currentStreak: Int = 0
-    @Published var totalEntries: Int = 0
+    @Published var moodFlowData: [MoodFlowData] = []
     
-    private let userDefaults = UserDefaults.standard
-    private let entriesKey = "moodEntries"
+    private let journalManager = JournalManager.shared
     
     init() {
-        loadEntries()
-        updateStats()
+        loadData()
     }
     
-    func addEntry(_ entry: MoodEntry) {
-        entries.insert(entry, at: 0)
-        saveEntries()
-        updateStats()
+    func loadData() {
+        entries = journalManager.entries
+        analyzeData()
+        calculateCurrentStreak()
+        calculateMoodFlowData()
     }
     
-    func deleteEntry(_ entry: MoodEntry) {
-        entries.removeAll { $0.id == entry.id }
-        saveEntries()
-        updateStats()
+    private func analyzeData() {
+        analyzeText()
+        analyzeMoodTransitions()
+        analyzeTimePatterns()
+        generateGrowthInsights()
+        calculateReflectionQuality()
     }
     
-    func updateEntry(_ entry: MoodEntry) {
-        if let index = entries.firstIndex(where: { $0.id == entry.id }) {
-            entries[index] = entry
-            saveEntries()
-        }
-    }
-    
-    private func saveEntries() {
-        if let encoded = try? JSONEncoder().encode(entries) {
-            userDefaults.set(encoded, forKey: entriesKey)
-        }
-    }
-    
-    private func loadEntries() {
-        if let data = userDefaults.data(forKey: entriesKey),
-           let decoded = try? JSONDecoder().decode([MoodEntry].self, from: data) {
-            entries = decoded
-        }
-    }
-    
-    private func updateStats() {
-        totalEntries = entries.count
-        currentStreak = calculateStreak()
-    }
-    
-    func calculateStreak() -> Int {
-        if entries.isEmpty { return 0 }
+    private func analyzeText() {
+        guard !entries.isEmpty else { return }
         
-        var streak = 0
-        let today = Calendar.current.startOfDay(for: Date())
+        let allText = entries.map { $0.content }.joined(separator: " ")
+        let words = allText.split(separator: " ").map(String.init)
+        let wordCount = words.count
         
-        for i in 0..<entries.count {
-            let entryDate = Calendar.current.startOfDay(for: entries[i].timestamp)
-            let dayDiff = Calendar.current.dateComponents([.day], from: entryDate, to: today).day ?? 0
+        // Simple word frequency analysis
+        let wordFrequencies = Dictionary(grouping: words, by: { $0.lowercased() })
+            .mapValues { $0.count }
+            .sorted { $0.value > $1.value }
+        
+        let topWords = Array(wordFrequencies.prefix(10).map { $0.key })
+        
+        textAnalysis = TextAnalysis(
+            averageLength: wordCount / entries.count,
+            topWords: topWords,
+            writingStyle: determineWritingStyle(words: words),
+            sentiment: calculateSentiment(text: allText),
+            themes: identifyThemes(words: words)
+        )
+    }
+    
+    private func analyzeMoodTransitions() {
+        guard entries.count >= 2 else { return }
+        
+        var transitions: [MoodTransition] = []
+        for i in 0..<entries.count - 1 {
+            let from = entries[i].mood
+            let to = entries[i + 1].mood
             
-            if dayDiff == streak {
+            if let index = transitions.firstIndex(where: { $0.from == from && $0.to == to }) {
+                transitions[index] = MoodTransition(
+                    from: from,
+                    to: to,
+                    count: transitions[index].count + 1
+                )
+            } else {
+                transitions.append(MoodTransition(from: from, to: to, count: 1))
+            }
+        }
+        
+        moodTransitions = transitions.sorted { $0.count > $1.count }
+    }
+    
+    private func analyzeTimePatterns() {
+        var patterns: [TimePatternData] = []
+        
+        // Analyze morning entries
+        let morningEntries = entries.filter { entry in
+            let hour = Calendar.current.component(.hour, from: entry.date)
+            return hour >= 5 && hour < 12
+        }
+        
+        if !morningEntries.isEmpty {
+            patterns.append(TimePatternData(
+                icon: "sunrise.fill",
+                title: "Morning Reflection",
+                description: "You tend to journal in the morning \(String(morningEntries.count)) times",
+                hour: 9,
+                count: morningEntries.count
+            ))
+        }
+        
+        // Analyze evening entries
+        let eveningEntries = entries.filter { entry in
+            let hour = Calendar.current.component(.hour, from: entry.date)
+            return hour >= 18 && hour < 24
+        }
+        
+        if !eveningEntries.isEmpty {
+            patterns.append(TimePatternData(
+                icon: "moon.stars.fill",
+                title: "Evening Reflection",
+                description: "You tend to journal in the evening \(String(eveningEntries.count)) times",
+                hour: 21,
+                count: eveningEntries.count
+            ))
+        }
+        
+        timePatterns = patterns
+    }
+    
+    private func generateGrowthInsights() {
+        guard !entries.isEmpty else { return }
+        
+        var insights: [String] = []
+        
+        // Analyze consistency
+        let consistency = calculateConsistency()
+        if consistency < 0.5 {
+            insights.append("Try to maintain a more consistent journaling schedule")
+        }
+        
+        // Analyze depth
+        let averageLength = entries.map { $0.content.split(separator: " ").count }.reduce(0, +) / entries.count
+        if averageLength < 50 {
+            insights.append("Consider writing longer entries to explore your thoughts more deeply")
+        }
+        
+        growthInsights = insights
+    }
+    
+    private func calculateReflectionQuality() {
+        guard !entries.isEmpty else { return }
+        
+        let averageLength = entries.map { $0.content.split(separator: " ").count }.reduce(0, +) / entries.count
+        let consistency = calculateConsistency()
+        
+        reflectionQuality = ReflectionQuality(
+            length: averageLength,
+            consistency: Int(consistency * 100),
+            feedback: generateFeedback(length: averageLength, consistency: consistency)
+        )
+    }
+    
+    private func calculateCurrentStreak() {
+        guard !entries.isEmpty else {
+            currentStreak = 0
+            return
+        }
+        
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        var currentDate = today
+        var streak = 0
+        
+        // Sort entries by date in descending order
+        let sortedEntries = entries.sorted { $0.date > $1.date }
+        
+        // Check each day from today backwards
+        while true {
+            let hasEntry = sortedEntries.contains { entry in
+                calendar.isDate(entry.date, inSameDayAs: currentDate)
+            }
+            
+            if hasEntry {
                 streak += 1
-            } else if dayDiff > streak {
+                currentDate = calendar.date(byAdding: .day, value: -1, to: currentDate)!
+            } else {
                 break
             }
         }
         
-        return streak
+        currentStreak = streak
     }
     
-    func filteredEntries() -> [MoodEntry] {
-        var filtered = entries
-        
-        // Apply time filter
-        switch currentFilter {
-        case .week:
-            let weekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date())!
-            filtered = filtered.filter { $0.timestamp > weekAgo }
-        case .month:
-            let monthAgo = Calendar.current.date(byAdding: .month, value: -1, to: Date())!
-            filtered = filtered.filter { $0.timestamp > monthAgo }
-        case .all:
-            break
+    private func calculateMoodFlowData() {
+        guard !entries.isEmpty else {
+            moodFlowData = []
+            return
         }
         
-        // Apply search filter
-        if !searchQuery.isEmpty {
-            filtered = filtered.filter {
-                $0.content.localizedCaseInsensitiveContains(searchQuery) ||
-                $0.mood.rawValue.localizedCaseInsensitiveContains(searchQuery)
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        
+        var dataPoints: [MoodFlowData] = []
+        
+        // Create a data point for each day
+        for dayOffset in 0...6 {
+            let date = calendar.date(byAdding: .day, value: dayOffset - 6, to: today)!
+            
+            // Get entries for this day
+            let dayEntries = entries.filter { entry in
+                calendar.isDate(entry.date, inSameDayAs: date)
+            }
+            
+            if !dayEntries.isEmpty {
+                // Calculate average mood value for the day
+                let totalMoodValue = dayEntries.reduce(0) { sum, entry in
+                    sum + entry.mood.toMoodType.value
+                }
+                let averageMoodValue = Double(totalMoodValue) / Double(dayEntries.count)
+                
+                dataPoints.append(MoodFlowData(
+                    date: date,
+                    value: averageMoodValue
+                ))
+            } else {
+                // Add a data point with 0 value for days without entries
+                dataPoints.append(MoodFlowData(
+                    date: date,
+                    value: 0
+                ))
             }
         }
         
-        return filtered
+        moodFlowData = dataPoints
     }
     
-    func entriesForLastSevenDays() -> [MoodEntry] {
-        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -6, to: Date())!
-        return entries.filter { $0.timestamp >= sevenDaysAgo }
-    }
+    // MARK: - Helper Methods
     
-    func averageMoodForDate(_ date: Date) -> Double? {
-        let dayEntries = entries.filter {
-            Calendar.current.isDate($0.timestamp, inSameDayAs: date)
+    private func determineWritingStyle(words: [String]) -> String {
+        let avgWordLength = Double(words.joined().count) / Double(words.count)
+        let longWords = words.filter { $0.count > 6 }.count
+        let longWordPercentage = Double(longWords) / Double(words.count)
+        
+        if avgWordLength > 5 && longWordPercentage > 0.2 {
+            return "Reflective and detailed"
+        } else if avgWordLength > 4 {
+            return "Balanced and thoughtful"
+        } else {
+            return "Concise and direct"
         }
-        
-        guard !dayEntries.isEmpty else { return nil }
-        
-        let total = dayEntries.reduce(0) { $0 + $1.mood.value }
-        return Double(total) / Double(dayEntries.count)
     }
     
-    func exportAsCSV() -> String {
-        var csv = "Date,Time,Mood,Entry,Word Count\n"
-        entries.forEach { entry in
-            let date = entry.timestamp.formatted(date: .numeric, time: .omitted)
-            let time = entry.timestamp.formatted(date: .omitted, time: .shortened)
-            let content = entry.content.replacingOccurrences(of: "\"", with: "\"\"")
-            csv += "\"\(date)\",\"\(time)\",\"\(entry.mood.displayName)\",\"\(content)\",\(entry.wordCount)\n"
-        }
-        return csv
+    private func calculateSentiment(text: String) -> Double {
+        // Simple sentiment analysis based on positive/negative word lists
+        // In a real app, you'd use a more sophisticated NLP approach
+        let positiveWords = ["happy", "joy", "grateful", "peace", "love", "good", "great", "wonderful"]
+        let negativeWords = ["sad", "angry", "frustrated", "anxious", "bad", "terrible", "awful"]
+        
+        let words = text.lowercased().split(separator: " ").map(String.init)
+        let positiveCount = words.filter { positiveWords.contains($0) }.count
+        let negativeCount = words.filter { negativeWords.contains($0) }.count
+        
+        return Double(positiveCount - negativeCount) / Double(words.count)
     }
     
-    func exportAsPDF() -> String {
-        var html = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Mood Journal</title>
-            <style>
-                body { font-family: -apple-system, system-ui, sans-serif; margin: 40px; color: #333; }
-                h1 { color: #1a1a1a; margin-bottom: 30px; }
-                .entry { margin-bottom: 30px; page-break-inside: avoid; }
-                .date { font-weight: bold; color: #666; }
-                .mood { display: inline-block; margin-left: 10px; }
-                .content { margin-top: 10px; line-height: 1.6; }
-                .wordcount { font-size: 12px; color: #999; margin-top: 5px; }
-            </style>
-        </head>
-        <body>
-            <h1>Mood Journal</h1>
-            <p>Generated on \(Date().formatted(date: .long, time: .shortened))</p>
-            <hr>
-        """
+    private func identifyThemes(words: [String]) -> [String] {
+        // Simple theme identification based on word frequency
+        // In a real app, you'd use topic modeling or other NLP techniques
+        let wordFrequencies = Dictionary(grouping: words, by: { $0.lowercased() })
+            .mapValues { $0.count }
+            .sorted { $0.value > $1.value }
         
-        entries.forEach { entry in
-            html += """
-                <div class="entry">
-                    <div class="date">\(entry.timestamp.formatted(date: .long, time: .shortened))</div>
-                    <div class="mood">Mood: \(entry.mood.displayName) \(entry.mood.emoji)</div>
-                    <div class="content">\(entry.content)</div>
-                    <div class="wordcount">Words: \(entry.wordCount)</div>
-                </div>
-            """
-        }
-        
-        html += "</body></html>"
-        return html
+        return Array(wordFrequencies.prefix(5).map { $0.key })
     }
-}
-
-enum JournalFilter: String, CaseIterable {
-    case all = "All"
-    case week = "This Week"
-    case month = "This Month"
+    
+    private func calculateConsistency() -> Double {
+        guard !entries.isEmpty else { return 0 }
+        
+        let calendar = Calendar.current
+        let dates = entries.map { calendar.startOfDay(for: $0.date) }
+        let uniqueDates = Set(dates)
+        
+        return Double(uniqueDates.count) / Double(entries.count)
+    }
+    
+    private func generateFeedback(length: Int, consistency: Double) -> String {
+        if length < 30 && consistency < 0.5 {
+            return "Try to write longer entries more consistently"
+        } else if length < 30 {
+            return "Consider writing longer entries to explore your thoughts more deeply"
+        } else if consistency < 0.5 {
+            return "Try to maintain a more consistent journaling schedule"
+        } else {
+            return "Great job maintaining a consistent and thoughtful journaling practice"
+        }
+    }
 } 

@@ -1,24 +1,22 @@
 import SwiftUI
 
 struct MoodSelectionView: View {
-    @Binding var selectedMood: MoodType?
-    @Binding var showingMoodSelection: Bool
-    @Binding var showingJournalEntry: Bool
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedMood: MoodType?
+    @State private var selectedIntensity: Int = 5
+    @EnvironmentObject private var themeManager: ThemeManager
+    let onMoodSelected: (MoodType, Int) -> Void
     
     var body: some View {
         NavigationView {
             VStack(spacing: 30) {
-                // Header
-                VStack(spacing: 10) {
-                    Text("How are you feeling?")
-                        .font(.title2)
-                        .fontWeight(.medium)
-                    
-                    Text("Take a moment to acknowledge your current state")
-                        .font(.subheadline)
-                        .foregroundColor(Theme.dark.secondaryTextColor)
-                }
-                .padding(.top, 30)
+                Text("How are you feeling?")
+                    .font(.title)
+                    .foregroundColor(themeManager.textColor)
+                
+                Text("Select your current mood")
+                    .font(.body)
+                    .foregroundColor(themeManager.secondaryTextColor)
                 
                 // Mood Grid
                 LazyVGrid(columns: [
@@ -27,22 +25,56 @@ struct MoodSelectionView: View {
                     GridItem(.flexible())
                 ], spacing: 20) {
                     ForEach(MoodType.allCases, id: \.self) { mood in
-                        MoodOptionButton(mood: mood) {
+                        MoodButton(
+                            mood: mood,
+                            isSelected: selectedMood == mood
+                        ) {
                             selectedMood = mood
-                            showingMoodSelection = false
-                            showingJournalEntry = true
                         }
                     }
                 }
                 .padding()
                 
+                if let selectedMood = selectedMood {
+                    VStack(spacing: 15) {
+                        Text("Intensity")
+                            .font(.headline)
+                            .foregroundColor(themeManager.textColor)
+                        
+                        Slider(value: Binding(
+                            get: { Double(selectedIntensity) },
+                            set: { selectedIntensity = Int($0) }
+                        ), in: 1...10, step: 1)
+                        .tint(themeManager.accentColor)
+                        
+                        Text("\(selectedIntensity)")
+                            .font(.body)
+                            .foregroundColor(themeManager.secondaryTextColor)
+                    }
+                    .padding()
+                    
+                    Button(action: {
+                        onMoodSelected(selectedMood, selectedIntensity)
+                    }) {
+                        Text("Continue to Journal")
+                            .font(.body)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(themeManager.accentColor)
+                            .cornerRadius(12)
+                    }
+                    .padding(.horizontal)
+                }
+                
                 Spacer()
             }
+            .padding()
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Cancel") {
-                        showingMoodSelection = false
+                        dismiss()
                     }
                 }
             }
@@ -50,34 +82,7 @@ struct MoodSelectionView: View {
     }
 }
 
-struct MoodOptionButton: View {
-    let mood: MoodType
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            VStack(spacing: 10) {
-                Text(mood.emoji)
-                    .font(.system(size: 32))
-                
-                Text(mood.displayName)
-                    .font(.subheadline)
-                    .foregroundColor(Theme.dark.primaryTextColor)
-            }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Theme.dark.secondaryBackgroundColor)
-            .cornerRadius(12)
-        }
-    }
-}
-
-struct MoodSelectionView_Previews: PreviewProvider {
-    static var previews: some View {
-        MoodSelectionView(
-            selectedMood: .constant(nil),
-            showingMoodSelection: .constant(true),
-            showingJournalEntry: .constant(false)
-        )
-    }
+#Preview {
+    MoodSelectionView { _, _ in }
+        .environmentObject(ThemeManager())
 } 

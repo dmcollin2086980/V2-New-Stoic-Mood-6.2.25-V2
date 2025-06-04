@@ -51,4 +51,16 @@ enum MoodType: String, Codable, CaseIterable {
     var displayName: String {
         rawValue.capitalized
     }
+    
+    /// Converts this MoodType to a Mood
+    var toMood: Mood {
+        switch self {
+        case .content: return .content
+        case .grateful: return .grateful
+        case .focused: return .focused
+        case .anxious: return .anxious
+        case .frustrated: return .frustrated
+        case .sad: return .sad
+        }
+    }
 } 
