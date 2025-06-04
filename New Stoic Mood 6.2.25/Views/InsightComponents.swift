@@ -446,7 +446,7 @@ struct InsightComponents_Previews: PreviewProvider {
             ])
             
             MoodDistributionChart(data: [
-                MoodDistribution(mood: .content, count: 5, percentage: 0.5),
+                MoodDistribution(mood: .calm, count: 5, percentage: 0.5),
                 MoodDistribution(mood: .focused, count: 3, percentage: 0.3),
                 MoodDistribution(mood: .anxious, count: 1, percentage: 0.1)
             ])

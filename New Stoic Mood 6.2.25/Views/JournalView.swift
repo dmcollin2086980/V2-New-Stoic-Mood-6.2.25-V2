@@ -17,14 +17,15 @@ struct JournalView: View {
     /// The currently selected filter for journal entries
     @State private var selectedFilter: JournalFilter = .all
     
-    /// The initial mood value when creating a new entry
-    @State private var initialMood: Mood?
+    /// A boolean indicating whether the journal flow sheet is presented
+    @State private var showingJournalSheet = false
     
-    /// The initial intensity value when creating a new entry
-    @State private var initialIntensity: Double?
+    /// The current step in the journal entry flow
+    @State private var flowStep: JournalFlowStep = .moodSelection
     
-    /// A boolean indicating whether the mood selection view is presented
-    @State private var showingMoodSelection = false
+    /// The selected mood and intensity for the new entry
+    @State private var selectedMood: Mood?
+    @State private var selectedIntensity: Double?
     
     /// A boolean indicating whether the export options view is presented
     @State private var showingExportOptions = false
@@ -57,31 +58,54 @@ struct JournalView: View {
     
     var body: some View {
         NavigationStack {
-            VStack(spacing: ThemeManager.padding) {
-                // Search bar
-                SearchBar(text: $searchText)
-                    .padding(.horizontal)
-                
-                // Filter buttons
-                HStack(spacing: ThemeManager.smallPadding) {
-                    ForEach(JournalFilter.allCases, id: \.self) { filter in
-                        FilterButton(
-                            title: filter.title,
-                            isSelected: selectedFilter == filter,
-                            action: { selectedFilter = filter }
-                        )
-                    }
-                }
-                .padding(.horizontal)
-                
-                // Journal entries list
-                ScrollView {
-                    LazyVStack(spacing: ThemeManager.padding) {
-                        ForEach(filteredEntries) { entry in
-                            JournalEntryCard(entry: entry)
+            ZStack {
+                VStack(spacing: ThemeManager.padding) {
+                    // Search bar
+                    SearchBar(text: $searchText)
+                        .padding(.horizontal)
+                    
+                    // Filter buttons
+                    HStack(spacing: ThemeManager.smallPadding) {
+                        ForEach(JournalFilter.allCases, id: \.self) { filter in
+                            FilterButton(
+                                title: filter.title,
+                                isSelected: selectedFilter == filter,
+                                action: { selectedFilter = filter }
+                            )
                         }
                     }
-                    .padding()
+                    .padding(.horizontal)
+                    
+                    // Journal entries list
+                    ScrollView {
+                        LazyVStack(spacing: ThemeManager.padding) {
+                            ForEach(filteredEntries) { entry in
+                                JournalEntryCard(entry: entry)
+                            }
+                        }
+                        .padding()
+                    }
+                }
+                
+                // Floating Action Button
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button(action: { 
+                            flowStep = .moodSelection
+                            showingJournalSheet = true 
+                        }) {
+                            Image(systemName: "plus")
+                                .font(.title2)
+                                .foregroundColor(.white)
+                                .frame(width: 60, height: 60)
+                                .background(themeManager.accentColor)
+                                .clipShape(Circle())
+                                .shadow(color: Color.black.opacity(0.3), radius: 5, x: 0, y: 3)
+                        }
+                        .padding()
+                    }
                 }
             }
             .navigationTitle("Journal")
@@ -92,24 +116,39 @@ struct JournalView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingMoodSelection) {
-                EnhancedMoodSelectionView { mood, intensity in
-                    initialMood = mood
-                    initialIntensity = intensity
+            .sheet(isPresented: $showingJournalSheet) {
+                Group {
+                    switch flowStep {
+                    case .moodSelection:
+                        MoodSelectionView { mood, intensity in
+                            selectedMood = mood.toMood
+                            selectedIntensity = Double(intensity) / 10.0
+                            flowStep = .journalEntry
+                        }
+                    case .journalEntry:
+                        if let mood = selectedMood, let intensity = selectedIntensity {
+                            JournalEntryView(mood: mood, intensity: intensity) { content in
+                                journalManager.addEntry(mood: mood, intensity: intensity, content: content)
+                                selectedMood = nil
+                                selectedIntensity = nil
+                                showingJournalSheet = false
+                            }
+                        }
+                    }
                 }
+                .presentationDetents([.large])
             }
             .sheet(isPresented: $showingExportOptions) {
                 ExportOptionsView()
             }
-            .onAppear {
-                if let mood = initialMood, let intensity = initialIntensity {
-                    journalManager.addEntry(mood: mood, intensity: intensity)
-                    initialMood = nil
-                    initialIntensity = nil
-                }
-            }
         }
     }
+}
+
+/// The steps in the journal entry flow
+enum JournalFlowStep {
+    case moodSelection
+    case journalEntry
 }
 
 /// A button used for filtering journal entries

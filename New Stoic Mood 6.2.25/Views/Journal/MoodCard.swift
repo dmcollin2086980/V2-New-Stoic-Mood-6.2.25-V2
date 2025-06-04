@@ -31,7 +31,7 @@ struct MoodCard: View {
 
 #Preview {
     MoodCard(
-        mood: .content,
+        mood: .happy,
         isSelected: true,
         action: {}
     )

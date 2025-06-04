@@ -2,60 +2,66 @@ import SwiftUI
 import Speech
 
 struct JournalEntryView: View {
-    @StateObject private var viewModel: JournalEntryViewModel
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var themeManager: ThemeManager
     
-    init(moodViewModel: MoodViewModel, initialPrompt: String? = nil) {
-        _viewModel = StateObject(wrappedValue: JournalEntryViewModel(moodViewModel: moodViewModel, initialPrompt: initialPrompt))
-    }
+    let mood: Mood
+    let intensity: Double
+    let onSave: (String) -> Void
+    
+    @State private var journalText = ""
+    @State private var isRecording = false
+    @State private var showingPermissionAlert = false
     
     var body: some View {
         NavigationView {
             VStack(spacing: Theme.padding) {
-                // Prompt Section
-                VStack(alignment: .leading, spacing: Theme.smallPadding) {
-                    Text("Reflection Prompt")
+                // Mood and Intensity Display
+                HStack {
+                    Text(mood.emoji)
+                        .font(.title)
+                    Text(mood.name)
                         .font(.headline)
-                        .themeText()
-                    
-                    Text(viewModel.currentPrompt)
-                        .font(.body)
-                        .themeText()
+                    Spacer()
+                    Text("Intensity: \(Int(intensity * 100))%")
+                        .font(.subheadline)
+                        .foregroundColor(themeManager.secondaryTextColor)
                 }
                 .padding()
-                .themeCard()
+                .background(themeManager.cardBackgroundColor)
+                .cornerRadius(ThemeManager.cornerRadius)
                 
                 // Journal Text Editor
-                TextEditor(text: $viewModel.journalText)
+                TextEditor(text: $journalText)
                     .frame(maxHeight: .infinity)
                     .padding()
-                    .themeCard()
-                    .themeText()
+                    .background(themeManager.cardBackgroundColor)
+                    .cornerRadius(ThemeManager.cornerRadius)
+                    .foregroundColor(themeManager.textColor)
                 
                 // Voice Recording Button
                 HStack {
                     Button(action: {
-                        if viewModel.isRecording {
-                            viewModel.stopRecording()
+                        if isRecording {
+                            stopRecording()
                         } else {
-                            viewModel.startRecording()
+                            startRecording()
                         }
                     }) {
-                        Image(systemName: viewModel.isRecording ? "stop.circle.fill" : "mic.circle.fill")
+                        Image(systemName: isRecording ? "stop.circle.fill" : "mic.circle.fill")
                             .font(.system(size: 44))
-                            .foregroundColor(viewModel.isRecording ? .red : Theme.accentColor)
+                            .foregroundColor(isRecording ? .red : themeManager.accentColor)
                     }
                     
-                    if viewModel.isRecording {
+                    if isRecording {
                         Text("Recording...")
-                            .themeText()
+                            .foregroundColor(themeManager.textColor)
                     }
                 }
                 .padding()
             }
             .padding()
-            .themeBackground()
+            .background(themeManager.backgroundColor)
             .navigationTitle("New Entry")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -63,18 +69,18 @@ struct JournalEntryView: View {
                     Button("Cancel") {
                         dismiss()
                     }
-                    .themeText()
+                    .foregroundColor(themeManager.textColor)
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        // Save entry
+                        onSave(journalText)
                         dismiss()
                     }
-                    .themeText()
+                    .foregroundColor(themeManager.textColor)
                 }
             }
-            .alert("Microphone Access Required", isPresented: $viewModel.showingPermissionAlert) {
+            .alert("Microphone Access Required", isPresented: $showingPermissionAlert) {
                 Button("Settings", role: .none) {
                     if let url = URL(string: UIApplication.openSettingsURLString) {
                         UIApplication.shared.open(url)
@@ -86,9 +92,19 @@ struct JournalEntryView: View {
             }
         }
     }
+    
+    private func startRecording() {
+        // TODO: Implement voice recording
+        isRecording = true
+    }
+    
+    private func stopRecording() {
+        // TODO: Implement voice recording
+        isRecording = false
+    }
 }
 
 #Preview {
-    JournalEntryView(moodViewModel: MoodViewModel())
+    JournalEntryView(mood: .happy, intensity: 0.8) { _ in }
         .environmentObject(ThemeManager())
 } 

@@ -28,7 +28,7 @@ struct MoodSelectionGrid: View {
 #Preview {
     MoodSelectionGrid(
         moods: Mood.allCases,
-        selectedMood: .content,
+        selectedMood: .calm,
         onMoodSelected: { _ in }
     )
     .environmentObject(ThemeManager())

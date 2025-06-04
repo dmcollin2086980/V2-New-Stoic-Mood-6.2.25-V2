@@ -62,7 +62,7 @@ struct EnhancedJournalEntryView: View {
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Save") {
-                        viewModel.saveEntry(mood: .content, intensity: 5, content: viewModel.journalText)
+                        viewModel.saveEntry(mood: .reflective, intensity: 5, content: viewModel.journalText)
                         dismiss()
                     }
                     .foregroundColor(themeManager.textColor)

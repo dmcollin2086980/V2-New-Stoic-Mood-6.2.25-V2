@@ -34,7 +34,7 @@ struct MoodButton: View {
 
 #Preview {
     MoodButton(
-        mood: .content,
+        mood: .calm,
         isSelected: true,
         action: {}
     )

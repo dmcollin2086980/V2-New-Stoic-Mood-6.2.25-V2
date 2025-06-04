@@ -32,7 +32,7 @@ class JournalViewModel: ObservableObject {
         entries = [
             MoodEntry(
                 id: now,
-                mood: .content,
+                mood: .calm,
                 content: "Feeling balanced and at peace today. The morning meditation helped set a positive tone.",
                 timestamp: now,
                 wordCount: 15,

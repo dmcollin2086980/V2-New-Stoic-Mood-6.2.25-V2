@@ -7,6 +7,20 @@ struct MoodSelectionView: View {
     @EnvironmentObject private var themeManager: ThemeManager
     let onMoodSelected: (MoodType, Int) -> Void
     
+    private let moods: [(type: MoodType, emoji: String, label: String)] = [
+        (.happy, "😀", "Happy"),
+        (.grateful, "🙏", "Grateful"),
+        (.focused, "🎯", "Focused"),
+        (.anxious, "😰", "Anxious"),
+        (.frustrated, "😤", "Frustrated"),
+        (.sad, "😞", "Sad"),
+        (.calm, "🧘", "Calm"),
+        (.energetic, "⚡", "Energetic"),
+        (.proud, "🎉", "Proud"),
+        (.reflective, "🥲", "Reflective"),
+        (.stressed, "😵‍💫", "Stressed")
+    ]
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 30) {
@@ -24,12 +38,31 @@ struct MoodSelectionView: View {
                     GridItem(.flexible()),
                     GridItem(.flexible())
                 ], spacing: 20) {
-                    ForEach(MoodType.allCases, id: \.self) { mood in
-                        MoodButton(
-                            mood: mood,
-                            isSelected: selectedMood == mood
-                        ) {
-                            selectedMood = mood
+                    ForEach(moods, id: \.type) { mood in
+                        VStack {
+                            Text(mood.emoji)
+                                .font(.system(size: 40))
+                            Text(mood.label)
+                                .font(.caption)
+                                .foregroundColor(themeManager.textColor)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(
+                            RoundedRectangle(cornerRadius: ThemeManager.cornerRadius)
+                                .fill(selectedMood == mood.type ? 
+                                    themeManager.accentColor.opacity(0.2) : 
+                                    themeManager.cardBackgroundColor)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: ThemeManager.cornerRadius)
+                                .stroke(selectedMood == mood.type ? 
+                                    themeManager.accentColor : 
+                                    themeManager.borderColor, 
+                                    lineWidth: 1)
+                        )
+                        .onTapGesture {
+                            selectedMood = mood.type
                         }
                     }
                 }
@@ -62,7 +95,7 @@ struct MoodSelectionView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(themeManager.accentColor)
-                            .cornerRadius(12)
+                            .cornerRadius(ThemeManager.cornerRadius)
                     }
                     .padding(.horizontal)
                 }
